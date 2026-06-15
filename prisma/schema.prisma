@@ -1,0 +1,103 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+// Перечисления для строгой типизации
+enum Role {
+  STUDENT // Ученик
+  TEACHER // Тренер / Учитель
+  ADMIN   // Администратор
+}
+
+enum LessonStatus {
+  SCHEDULED // Запланирован
+  COMPLETED // Завершен
+}
+
+enum SupportStatus {
+  OPEN // Открыт
+  CLOSED // Закрыт
+}
+
+// Единая модель для пользователей всех ролей
+model User {
+  id String @id @default(uuid()) // Генерация UUIDv7
+  fullname String
+  email String @unique
+  password String   // Хэшированный пароль для NextAuth
+  phone String?
+  birthDate String?  // Строка YYYY-MM-DD для простоты HTML-форм
+  passport String?  // Нужен для тренеров
+  medicalDocuments String?  // Ссылки/информация о справках ученика
+  bio String?  // Описание опыта тренера
+  
+  role Role @default(STUDENT) 
+  isChecked Boolean @default(false)
+
+  teacherId String?
+  teacher User? @relation("TeacherStudents", fields: [teacherId], references: [id], onDelete: SetNull)
+  students User[] @relation("TeacherStudents")
+
+  // Связи с другими таблицами
+  studentLessons Lesson[] @relation("StudentLessons")
+  teacherLessons Lesson[] @relation("TeacherLessons")
+  gameStats GameRound[]
+  supportTickets Support[]
+
+  createdAt DateTime @default(now())
+}
+
+// Таблица для расписания из 5 уроков
+model Lesson {
+  id String @id @default(uuid())
+  
+  studentId String
+  student User @relation("StudentLessons", fields: [studentId], references: [id], onDelete: Cascade)
+  
+  teacherId String
+  teacher User @relation("TeacherLessons", fields: [teacherId], references: [id], onDelete: Cascade)
+  
+  lessonNumber Int      
+  topic String   
+  scheduledAt DateTime 
+  meetLink String?
+  
+  status LessonStatus @default(SCHEDULED) 
+}
+
+// Статистика 4-х испытаний из игры на Unity
+model GameRound {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  challenge1 Float
+  challenge2 Float
+  challenge3 Float
+  challenge4 Float
+  time Float
+  
+  totalScore Float
+  createdAt DateTime @default(now())
+}
+
+// Обращения в техподдержку
+model Support {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  topic String
+  description String
+  answer String?
+  
+  status SupportStatus @default(OPEN) 
+  
+  createdAt DateTime @default(now())
+}
